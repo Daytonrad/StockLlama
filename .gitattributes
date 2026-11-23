@@ -1,0 +1,4 @@
+# Keep LF in the repo and on checkout so gofmt and staticcheck behave the same on Windows.
+* text=auto eol=lf
+# Batch files need CRLF on Windows.
+*.cmd text eol=crlf
