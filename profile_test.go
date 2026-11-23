@@ -159,6 +159,24 @@ func TestPGNMultiple(t *testing.T) {
 		t.Fatal(len(g), err)
 	}
 }
+func TestPGNHeadersContainingOneDot(t *testing.T) {
+	dated := `[Event "Round 1. Open"]
+[Date "2024.01.15"]
+[White "Target"]
+[Black "Other"]
+[Result "1-0"]
+
+1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0`
+	for _, tc := range []struct {
+		text string
+		want int
+	}{{dated, 1}, {dated + "\n\n" + dated, 2}} {
+		g, err := parsePGN(tc.text)
+		if err != nil || len(g) != tc.want {
+			t.Fatalf("got %d games, want %d: %v", len(g), tc.want, err)
+		}
+	}
+}
 func TestImports(t *testing.T) {
 	games, _ := json.Marshal([]rawGame{{PGN: demo}})
 	wrapped, _ := json.Marshal(map[string]any{"games": []rawGame{{PGN: demo}}})
