@@ -132,6 +132,19 @@ func TestDrillWrongCorrectReveal(t *testing.T) {
 		t.Fatal(code)
 	}
 }
+func TestCorruptedDrillFENReturnsError(t *testing.T) {
+	a := newApp(t.TempDir())
+	a.current = fixture(t)
+	a.current.Puzzles = []puzzle{{FEN: "not a fen", Best: "e2e4", Loss: 200}}
+	for _, path := range []string{"/api/hint", "/api/coach", "/api/drill"} {
+		t.Run(path, func(t *testing.T) {
+			code, data := request(t, a, "POST", path, map[string]any{"mode": "drill", "index": 0})
+			if code != 400 || !strings.Contains(string(data), "drill position is invalid") {
+				t.Fatal(code, string(data))
+			}
+		})
+	}
+}
 func TestFailedEngineRollsBackHumanMove(t *testing.T) {
 	a := newApp(t.TempDir())
 	a.current = fixture(t)
