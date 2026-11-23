@@ -78,8 +78,14 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 		return "", fmt.Errorf("unexpected Stockfish download URL")
 	}
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	res, err := apiClient.Do(req)
+	// The archive is large, so the download has no overall client timeout;
+	// the caller's context bounds it instead.
+	download := &http.Client{Transport: apiClient.Transport, CheckRedirect: apiClient.CheckRedirect}
+	res, err := download.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("engine download cancelled or timed out: %w", ctx.Err())
+		}
 		return "", fmt.Errorf("Stockfish download failed")
 	}
 	defer res.Body.Close()
@@ -99,6 +105,9 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	hash := sha256.New()
 	n, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(reader, 200<<20))
 	file.Close()
+	if err != nil && ctx.Err() != nil {
+		return "", fmt.Errorf("engine download cancelled or timed out: %w", ctx.Err())
+	}
 	if err != nil || n >= 200<<20 {
 		return "", fmt.Errorf("engine download incomplete or too large")
 	}
