@@ -71,6 +71,10 @@ func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
 }
+
+// errBadDrill is returned when a saved drill position cannot be parsed.
+var errBadDrill = fmt.Errorf("this drill position is invalid; re-analyse the player to rebuild drills")
+
 func fail(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
@@ -348,7 +352,11 @@ func (a *app) handler() http.Handler {
 		}
 		pos := a.game.Position()
 		if in.Mode == "drill" && in.Index >= 0 && in.Index < len(a.current.Puzzles) {
-			g, _ := gameAt(a.current.Puzzles[in.Index].FEN)
+			g, err := gameAt(a.current.Puzzles[in.Index].FEN)
+			if err != nil {
+				fail(w, errBadDrill)
+				return
+			}
 			pos = g.Position()
 		}
 		text, err := positionAdvice(a.current, pos, a)
@@ -497,7 +505,12 @@ func (a *app) handler() http.Handler {
 		p, s := a.current, a.settings
 		g := a.game.Clone()
 		if p != nil && in.Mode == "drill" && in.Index >= 0 && in.Index < len(p.Puzzles) {
-			g, _ = gameAt(p.Puzzles[in.Index].FEN)
+			var err error
+			if g, err = gameAt(p.Puzzles[in.Index].FEN); err != nil {
+				a.mu.Unlock()
+				fail(w, errBadDrill)
+				return
+			}
 		}
 		if p == nil {
 			a.mu.Unlock()
@@ -596,7 +609,11 @@ func (a *app) handler() http.Handler {
 			return
 		}
 		q := a.current.Puzzles[in.Index]
-		g, _ := gameAt(q.FEN)
+		g, err := gameAt(q.FEN)
+		if err != nil {
+			fail(w, errBadDrill)
+			return
+		}
 		correct := false
 		message := "Find the strongest reply"
 		if in.Move != "" {
