@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -178,7 +179,7 @@ func TestInstallEngineSlowDownload(t *testing.T) {
 		// The download outlasts the client timeout but finishes within the context.
 		{"slower than client timeout", 300 * time.Millisecond, 0, true},
 		// A cancelled context stops a download that would otherwise hang.
-		{"cancelled", time.Minute, 100 * time.Millisecond, false},
+		{"cancelled", time.Minute, time.Second, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -203,7 +204,7 @@ func TestInstallEngineSlowDownload(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !tc.ok {
-				if err == nil || !strings.Contains(err.Error(), "cancelled") {
+				if !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("want a cancellation error, got %v", err)
 				}
 				if time.Since(start) > 10*time.Second {

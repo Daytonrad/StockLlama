@@ -105,7 +105,7 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	hash := sha256.New()
 	n, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(reader, 200<<20))
 	file.Close()
-	if ctx.Err() != nil {
+	if err != nil && ctx.Err() != nil {
 		return "", fmt.Errorf("engine download cancelled or timed out: %w", ctx.Err())
 	}
 	if err != nil || n >= 200<<20 {
