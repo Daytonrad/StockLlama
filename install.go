@@ -50,6 +50,7 @@ func stockfishAsset(names []string, goos, goarch string) int {
 	}
 	return -1
 }
+
 func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	var release struct {
 		Assets []struct {

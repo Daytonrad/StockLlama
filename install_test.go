@@ -68,8 +68,11 @@ func TestInstallEngineVerifiesDigest(t *testing.T) {
 	sum := sha256.Sum256(archive.Bytes())
 	good := "sha256:" + hex.EncodeToString(sum[:])
 
-	name := sf19Assets[stockfishAsset(sf19Assets, runtime.GOOS, runtime.GOARCH)]
-	name = strings.TrimSuffix(name, ".tar.gz") + ".zip"
+	i := stockfishAsset(sf19Assets, runtime.GOOS, runtime.GOARCH)
+	if i < 0 {
+		t.Skipf("no sf_19 build for %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	name := strings.TrimSuffix(sf19Assets[i], ".tar.gz") + ".zip"
 	download := "https://github.com/official-stockfish/Stockfish/releases/download/sf_test/" + name
 
 	for _, tc := range []struct {
