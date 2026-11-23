@@ -30,6 +30,26 @@ func (p *progressReader) Read(b []byte) (int, error) {
 	}
 	return n, err
 }
+
+// stockfishAsset returns the index of the release asset to download for goos
+// and goarch, or -1 if none fits. macOS ships one universal build for both
+// architectures; other systems ship one universal build per architecture.
+func stockfishAsset(names []string, goos, goarch string) int {
+	arch := "x86-64"
+	if goarch == "arm64" {
+		arch = "arm64"
+	}
+	for i, n := range names {
+		if goos == "darwin" {
+			if strings.HasPrefix(n, "stockfish-macos-universal") {
+				return i
+			}
+		} else if strings.Contains(n, goos+"-"+arch) && strings.Contains(n, "universal") {
+			return i
+		}
+	}
+	return -1
+}
 func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	var release struct {
 		Assets []struct {
@@ -41,20 +61,14 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	if err := getJSON(ctx, apiClient, "https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", &release); err != nil {
 		return "", fmt.Errorf("cannot fetch official Stockfish release: %w", err)
 	}
-	arch := "x86-64"
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-	platform := runtime.GOOS
-	if platform == "darwin" {
-		platform = "macos"
+	names := make([]string, len(release.Assets))
+	for i, a := range release.Assets {
+		names[i] = a.Name
 	}
 	url, name, digest := "", "", ""
-	for _, a := range release.Assets {
-		if strings.Contains(a.Name, platform+"-"+arch) && strings.Contains(a.Name, "universal") {
-			url, name, digest = a.URL, a.Name, a.Digest
-			break
-		}
+	if i := stockfishAsset(names, runtime.GOOS, runtime.GOARCH); i >= 0 {
+		a := release.Assets[i]
+		url, name, digest = a.URL, a.Name, a.Digest
 	}
 	if url == "" {
 		return "", fmt.Errorf("no universal Stockfish build found; download from stockfishchess.org and set its path")

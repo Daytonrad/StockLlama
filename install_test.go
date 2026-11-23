@@ -28,6 +28,37 @@ func (f fakeGitHub) RoundTrip(r *http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Header: http.Header{}, Request: r}, nil
 }
 
+// sf19Assets is the real asset list of the official sf_19 release.
+var sf19Assets = []string{
+	"stockfish-android-arm64-universal.tar.gz",
+	"stockfish-android-armv7-neon.tar.gz",
+	"stockfish-linux-arm64-universal.tar.gz",
+	"stockfish-linux-riscv64-universal.tar.gz",
+	"stockfish-linux-x86-64-universal.tar.gz",
+	"stockfish-macos-universal.tar.gz",
+	"stockfish-windows-arm64-universal.zip",
+	"stockfish-windows-x86-64-universal.zip",
+}
+
+func TestStockfishAsset(t *testing.T) {
+	for _, tc := range []struct{ goos, goarch, want string }{
+		{"darwin", "arm64", "stockfish-macos-universal.tar.gz"},
+		{"darwin", "amd64", "stockfish-macos-universal.tar.gz"},
+		{"linux", "amd64", "stockfish-linux-x86-64-universal.tar.gz"},
+		{"linux", "arm64", "stockfish-linux-arm64-universal.tar.gz"},
+		{"windows", "amd64", "stockfish-windows-x86-64-universal.zip"},
+		{"windows", "arm64", "stockfish-windows-arm64-universal.zip"},
+	} {
+		i := stockfishAsset(sf19Assets, tc.goos, tc.goarch)
+		if i < 0 || sf19Assets[i] != tc.want {
+			t.Errorf("%s/%s: got index %d, want %s", tc.goos, tc.goarch, i, tc.want)
+		}
+	}
+	if i := stockfishAsset([]string{"stockfish-linux-x86-64-universal.tar.gz"}, "darwin", "arm64"); i != -1 {
+		t.Errorf("darwin matched a Linux build at index %d", i)
+	}
+}
+
 func TestInstallEngineVerifiesDigest(t *testing.T) {
 	var archive bytes.Buffer
 	z := zip.NewWriter(&archive)
@@ -37,14 +68,8 @@ func TestInstallEngineVerifiesDigest(t *testing.T) {
 	sum := sha256.Sum256(archive.Bytes())
 	good := "sha256:" + hex.EncodeToString(sum[:])
 
-	platform, arch := runtime.GOOS, "x86-64"
-	if platform == "darwin" {
-		platform = "macos"
-	}
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-	name := "stockfish-" + platform + "-" + arch + "-universal.zip"
+	name := sf19Assets[stockfishAsset(sf19Assets, runtime.GOOS, runtime.GOARCH)]
+	name = strings.TrimSuffix(name, ".tar.gz") + ".zip"
 	download := "https://github.com/official-stockfish/Stockfish/releases/download/sf_test/" + name
 
 	for _, tc := range []struct {
