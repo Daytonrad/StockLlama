@@ -5,6 +5,8 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,8 +33,9 @@ func (p *progressReader) Read(b []byte) (int, error) {
 func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	var release struct {
 		Assets []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
+			Name   string `json:"name"`
+			URL    string `json:"browser_download_url"`
+			Digest string `json:"digest"`
 		} `json:"assets"`
 	}
 	if err := getJSON(ctx, apiClient, "https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", &release); err != nil {
@@ -46,12 +49,10 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	if platform == "darwin" {
 		platform = "macos"
 	}
-	url := ""
-	name := ""
+	url, name, digest := "", "", ""
 	for _, a := range release.Assets {
 		if strings.Contains(a.Name, platform+"-"+arch) && strings.Contains(a.Name, "universal") {
-			url = a.URL
-			name = a.Name
+			url, name, digest = a.URL, a.Name, a.Digest
 			break
 		}
 	}
@@ -80,10 +81,14 @@ func installEngine(ctx context.Context, notify ...func(int)) (string, error) {
 	if len(notify) > 0 {
 		reader = &progressReader{reader: res.Body, total: res.ContentLength, notify: notify[0]}
 	}
-	n, err := io.Copy(file, io.LimitReader(reader, 200<<20))
+	hash := sha256.New()
+	n, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(reader, 200<<20))
 	file.Close()
 	if err != nil || n >= 200<<20 {
 		return "", fmt.Errorf("engine download incomplete or too large")
+	}
+	if digest == "" || digest != "sha256:"+hex.EncodeToString(hash.Sum(nil)) {
+		return "", fmt.Errorf("engine download failed checksum verification")
 	}
 	destination := filepath.Join("engines", "stockfish-local")
 	if runtime.GOOS == "windows" {
