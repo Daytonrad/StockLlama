@@ -274,7 +274,9 @@ func TestProviderRedirectDoesNotForwardKey(t *testing.T) {
 	called := false
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true }))
 	defer target.Close()
-	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, 307) }))
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
 	defer source.Close()
 	s := settings{Provider: "api", Endpoint: source.URL, Model: "m", APIKey: "key"}
 	if _, e := coach(context.Background(), fixture(t), s); e == nil || called {

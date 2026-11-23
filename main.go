@@ -627,18 +627,18 @@ func (a *app) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, err := net.SplitHostPort(r.Host)
 		if err != nil || host != "127.0.0.1" {
-			http.Error(w, "local access only", 403)
+			http.Error(w, "local access only", http.StatusForbidden)
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, e := url.Parse(origin)
 			if e != nil || u.Host != r.Host || u.Scheme != "http" {
-				http.Error(w, "origin rejected", 403)
+				http.Error(w, "origin rejected", http.StatusForbidden)
 				return
 			}
 		}
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.Header.Get("X-StockLlama") != a.token {
-			http.Error(w, "session rejected; reload the app", 403)
+			http.Error(w, "session rejected; reload the app", http.StatusForbidden)
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
