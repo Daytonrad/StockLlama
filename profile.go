@@ -136,7 +136,7 @@ func parsePGN(text string) ([]rawGame, error) {
 	offsets := []int{0}
 	previous := 0
 	for _, s := range starts {
-		if strings.Contains(text[previous:s[0]], "1.") {
+		if hasMovetext(text[previous:s[0]]) {
 			offsets = append(offsets, s[0])
 		}
 		previous = s[0]
@@ -160,6 +160,17 @@ func parsePGN(text string) ([]rawGame, error) {
 		return nil, fmt.Errorf("file contains no PGN games")
 	}
 	return games, nil
+}
+
+// hasMovetext reports whether s contains a non-blank line that is not a header.
+func hasMovetext(s string) bool {
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "[") {
+			return true
+		}
+	}
+	return false
 }
 func importData(name string, data []byte) ([]rawGame, *profile, error) {
 	switch {
